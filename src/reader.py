@@ -26,7 +26,9 @@ class UAssetSerializer:
         name_suffix = self.read_int(4, endianness="le", signed=False)
         name = self.nametable[name]
         if name_suffix:
-            name += f".{name_suffix}"
+            # Noticed that all items start at 2 instead of 0, so BG_Ashrah.2 is actually BG_Ashrah_1
+            name += f"_{name_suffix-1}" # Enable if you want
+            # name += f".{name_suffix}" # Enable if you want
         return name
 
     def read_fname_class(self): # Classes are signed and negative
