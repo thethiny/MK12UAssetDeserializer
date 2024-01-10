@@ -49,7 +49,7 @@ with open(file_in, 'rb') as f:
         # Normal Reading Part
         root_obj_name = reader.read_fname()
         root_obj_type = reader.read_fname()
-        # Reading RowStruct
+        # Reading RowStruct # TODO: Move RowStruct to a handler and manually pass type is RowStruct ObjectProperty
         root_obj_flags = reader.read_int(4)
         root_obj_id = reader.read_int(4)
         _ = reader.read_int(1)
@@ -94,3 +94,4 @@ with open(f"parsed/{input_file_name}.json", "w+", encoding="utf-8") as f:
 # TODO: Missing TextProperty
 # TODO: Missing handling when there are actual currency prices so try on gear or something
 # TODO: Missing bundles. Edit: Not proper
+# TODO: Kollection is not MKInventory so have to re-parse
