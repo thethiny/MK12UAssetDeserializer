@@ -20,7 +20,8 @@ ALLOWED_CATEGORIES = set([
     "Environment",
     "Ladder-Ending",
     "PlayerModule",
-    "Taunt"
+    "Taunt",
+    "Music"
 ])
 
 CHARACTERS = set([
@@ -105,11 +106,14 @@ def parse_rarity(rarity):
 
 for root, folders, files in os.walk("parsed"):
     for file in files:
-        print("Parsing file", file)
+        print("Parsing file", file, "") # "" for space at the end
         file_path = os.path.join(root, file)
         with open(file_path, encoding="utf-8") as f:
             data = json.load(f)
             data = data.get("RowStruct", None) or data.get("LootTable", None)
+            if not data:
+                print("Emoty file. Skipping...")
+                continue
             if data is None:
                 raise Exception(f"Couldn't determine data type!")
             
@@ -141,7 +145,7 @@ for root, folders, files in os.walk("parsed"):
             if not character:
                 characters = KAMEOS & tags
                 if len(characters) > 1:
-                    print(f"Found more than character in item {item_id}!")
+                    print(f"Found more than kameo in item {item_id}!")
                     exit()
                 if characters:
                     character = characters.pop()
@@ -160,7 +164,8 @@ for root, folders, files in os.walk("parsed"):
                     type_dict = global_data.setdefault(category, {})
                     if not character:
                         print(f"Warning! Character Subtag {category} with no Character!")
-                        exit()
+                        character = "Unknown"
+                        # exit()
                     categorized_dict = type_dict.setdefault(character, {})
                     found_type = category
                     break # One tag only
