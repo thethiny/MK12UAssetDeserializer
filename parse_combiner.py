@@ -7,7 +7,7 @@ gear_parse_re = re.compile(r"(.+)_Gear(\d+)(?:_(.+))?")
 player_module_re = re.compile(r"(F|B)G_([A-Za-z]+)(_.+)+")
 character_skin_re = re.compile(r"([A-Za-z]+)_Skin(\d+)(.*)")
 
-global_data = {"unknown": {}}
+global_data = {"Other": {}}
 
 ALLOWED_CATEGORIES = set([
     "Fatality",
@@ -18,10 +18,12 @@ ALLOWED_CATEGORIES = set([
     "Bundle",
     "Consumable",
     "Environment",
+    "EnvironmentArt",
     "Ladder-Ending",
     "PlayerModule",
     "Taunt",
-    "Music"
+    "Music",
+    "Progression"
 ])
 
 CHARACTERS = set([
@@ -102,7 +104,7 @@ RARITIES = {
 }
 
 def parse_rarity(rarity):
-    return RARITIES.get(rarity, "Unknown")
+    return RARITIES.get(rarity, "Other")
 
 for root, folders, files in os.walk("parsed"):
     for file in files:
@@ -129,10 +131,14 @@ for root, folders, files in os.walk("parsed"):
             bundled_items = item_dict.get("BundledItems", [])
             bundled_items = [item["RowName"] for item in bundled_items]
             
-            categorized_dict = global_data["unknown"] # Fallback
+            categorized_dict = global_data["Other"] # Fallback
             tags = set(item_dict.get("Tags", []))
             tags |= set(item_dict.get("InternalTags", []))
             character = item_dict.get("Character", {}).get("RowName")
+            
+            if item_id in CHARACTERS | KAMEOS:
+                # character = item_id
+                tags.add(item_id)
             
             if not character:
                 characters = CHARACTERS & tags
@@ -164,7 +170,7 @@ for root, folders, files in os.walk("parsed"):
                     type_dict = global_data.setdefault(category, {})
                     if not character:
                         print(f"Warning! Character Subtag {category} with no Character!")
-                        character = "Unknown"
+                        character = "Other"
                         # exit()
                     categorized_dict = type_dict.setdefault(character, {})
                     found_type = category
@@ -180,7 +186,7 @@ for root, folders, files in os.walk("parsed"):
                     # break # Allow to be overridden by character tag
             if found_type is None:
                 print(f"Item {item_id} has no allowed tags!", tags)
-                # Replace later with `Unknown` category
+                # Replace later with `Other` category
                 
             small_icon = item_dict.get("PreviewIcon", "None")
             large_icon = item_dict.get("LargePreviewIcon", "None")
@@ -192,6 +198,9 @@ for root, folders, files in os.walk("parsed"):
                 if found:
                     character = found.groups()[1]
                     categorized_dict = type_dict.setdefault(character, {})
+            elif found_type == "EnvironmentArt":
+                if small_icon == large_icon == "None":
+                    large_icon = item_dict.get("Asset", "None")
                        
             icons = {
                 "small": small_icon,
@@ -248,6 +257,8 @@ def postprocess_dict(dictionary):
             if v == "None":
                 v = None
             d[k] = postprocess_dict(v)
+            if d[k] == {}: # Empty dict
+                d.pop(k) # No need
         return d
     else:
         return dictionary
