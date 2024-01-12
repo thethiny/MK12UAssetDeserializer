@@ -8,6 +8,23 @@ INT_PACK_DICT = {1: 'B', 2: 'H', 4: 'I', 8: 'Q'}
 FLOAT_PACK_DICT = {4: 'f', 8: 'd'}
 
 class UAssetSerializer:
+    
+    SUPPORTED_CLASSES = {
+        "RowStruct",
+        "mLootStruct"
+    }
+    SUPPORTED_STRUCTS = {
+        "ColorPaletteSwatch",
+        "MKInventoryItemPrice",
+        "MKInventoryDataTableRowHandle",
+        "MKInventoryItemDefinitionGroupWithAsset",
+        "MKLootTable",
+        "MKLootTableDropItem",
+        "MKLootDropItemPicker",
+        "MKLootDropItemPrerequisitePicker",
+        "MK12InventoryLootItem"
+    }
+    
     def __init__(self, nametable: List[str] = [], reader: Optional[BufferedReader] = None):
         if nametable:
             self.set_nametable(nametable)
@@ -84,7 +101,7 @@ class UAssetSerializer:
         _ = self.read_int(8)
         value = self.read_int(1)
         _ = self.file_handle.read(1)
-        return value
+        return value == 1
 
     def read_int_property(self, signed=True):
         size = self.read_int(8)
@@ -152,6 +169,7 @@ class UAssetSerializer:
     def read_string_property(self):
         array_size = self.read_int(8)
         string = self.read_string(array_size)
+        _ = self.read_int(1)
         return string
     
     def read_name_property(self, from_array = False):
@@ -263,6 +281,29 @@ class UAssetSerializer:
             if struct_type == "DateTime":
                 struct_data_dict["date"] = self.read_int(4)
                 struct_data_dict["time"] = self.read_int(4)
+            elif struct_type == "Color":
+                color = self.read_int(4)
+                alpha = color >> 24
+                color = color & 0xFFFFFF
+                value = f"#{color:0>2x}{alpha:0>2x}"
+                struct_data_dict = value
+            else:
+                if struct_type not in self.SUPPORTED_STRUCTS:
+                    print(f"Warning: Struct Type {struct_type} is not officially supported. Undefined behavior _may_ occur.")
+                is_struct_over = self.read_fname() == "None"
+                while is_struct_over != "None":
+                    self.file_handle.seek(-8, 1) # Return from here
+                    n, v = self.read_property_once()
+                    struct_data_dict[n] = v
+                    is_struct_over = self.read_fname()
+                        
+            if True:
+                ...
+            elif struct_type == "ColorPaletteSwatch":
+                for _ in range(4):
+                    n, v = self.read_property_once()
+                    struct_data_dict[n] = v
+                assert self.read_fname() == "None" # None
             elif struct_type == "MKInventoryItemPrice":
                 for _ in range(3): # Either change this to be based on struct size, or change it to wait until == None
                     n, v = self.read_property_once()
@@ -286,7 +327,7 @@ class UAssetSerializer:
                 for _ in range(1):
                     n, v = self.read_property_once()
                     struct_data_dict[n] = v
-                _ = self.file_handle.read(1) # TODO: Most likely this is wrong and should've been in String Property
+                # _ = self.file_handle.read(1) # TODO: Most likely this is wrong and should've been in String Property
                 assert self.read_fname() == "None" # None
             elif struct_type == "MKLootTable": # Should probably combine them all into while fname != None since they share the same code
                 for _ in range(2):
@@ -314,17 +355,6 @@ class UAssetSerializer:
                     n, v = self.read_property_once()
                     struct_data_dict[n] = v
                 assert self.read_fname() == "None" # None
-            elif struct_type == "ColorPaletteSwatch":
-                for _ in range(4):
-                    n, v = self.read_property_once()
-                    struct_data_dict[n] = v
-                assert self.read_fname() == "None" # None
-            elif struct_type == "Color":
-                color = self.read_int(4)
-                alpha = color >> 24
-                color = color & 0xFFFFFF
-                value = f"#{color:0>2x}{alpha:0>2x}"
-                struct_data_dict = value
             else:
                 raise NotImplementedError(f"Unknown StructProperty {struct_type}")
 
@@ -338,7 +368,7 @@ class UAssetSerializer:
             return loop_data[0]
         return loop_data
           
-    def read_data_as_type(self, value_type, element_name = "", loop_count = 1, from_array=False): # Element_name is only here for some specific cases, since I couldnt figure it out
+    def read_data_as_type(self, value_type: str, element_name = "", loop_count = 1, from_array=False): # Element_name is only here for some specific cases, since I couldnt figure it out
         if value_type == "TextProperty":
             value = self.read_text_property()
         elif value_type == "EnumProperty":
@@ -347,10 +377,9 @@ class UAssetSerializer:
             value = self.read_struct_property(loop_count)
         elif value_type == "BoolProperty":
             value = self.read_bool_property()
-        elif value_type == "IntProperty":
-            value = self.read_int_property()
-        elif value_type == "UInt32Property":
-            value = self.read_int_property(signed=True)
+        elif "Int" in value_type and value_type.endswith("Property"):
+            signed = value_type[0] != "U"
+            value = self.read_int_property(signed=signed)
         elif value_type == "FloatProperty":
             value = self.read_float_property()
         elif value_type == "ArrayProperty":

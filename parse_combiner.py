@@ -105,6 +105,7 @@ def parse_rarity(rarity):
 
 for root, folders, files in os.walk("parsed"):
     for file in files:
+        print("Parsing file", file)
         file_path = os.path.join(root, file)
         with open(file_path, encoding="utf-8") as f:
             data = json.load(f)
@@ -113,10 +114,9 @@ for root, folders, files in os.walk("parsed"):
                 raise Exception(f"Couldn't determine data type!")
             
         for item_id, item_dict in data.items():
-            
             translation_id, translation_default = item_dict.get("Title") or [None, None]
             requirement_trans_id, requirement_trans_default = item_dict.get("UnlockRequirement") or [None, None]
-            rarity = item_dict.get("Rarity", {}).get("value", {}).get("name", "")
+            rarity = item_dict.get("Rarity", {}).get("value", "")
             rarity = rarity.rsplit("::", 1)[-1]
             rarity = parse_rarity(rarity)
             
