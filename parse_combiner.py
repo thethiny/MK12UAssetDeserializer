@@ -108,6 +108,9 @@ for root, folders, files in os.walk("parsed"):
         file_path = os.path.join(root, file)
         with open(file_path, encoding="utf-8") as f:
             data = json.load(f)
+            data = data.get("RowStruct", None) or data.get("LootTable", None)
+            if data is None:
+                raise Exception(f"Couldn't determine data type!")
             
         for item_id, item_dict in data.items():
             
