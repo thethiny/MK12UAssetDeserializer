@@ -1,4 +1,4 @@
-$outPath = "automated_all"
+$outPath = "automate_all"
 mkdir $outPath 2> $NULL 1> $NULL
 
 if (-not $args[0])
