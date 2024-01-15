@@ -1,7 +1,6 @@
 import json
 import os
 import sys
-import math
 from src.reader import UAssetSerializer
 
 argc = len(sys.argv)
