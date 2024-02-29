@@ -6,6 +6,7 @@ character_stuff_re = re.compile(r"(?:Character|Kameo)-?(.+\b)")
 gear_parse_re = re.compile(r"(.+)_Gear(\d+)(?:_(.+))?")
 player_module_re = re.compile(r"(F|B)G_([A-Za-z]+)(_.+)+")
 character_skin_re = re.compile(r"([A-Za-z]+)_Skin(\d+)(.*)")
+taunt_re = re.compile(r"([A-Za-z]+)_([A-Za-z]+)(\d+)")
 
 global_data = {"Other": {}}
 
@@ -55,7 +56,7 @@ CHARACTERS = set([
     # DLC
     "OmniMan",
     "QuanChi",
-    "PeaceMaker",
+    "Peacemaker",
     "Ermac",
     "Homelander",
     "Takeda",
@@ -191,6 +192,8 @@ for root, folders, files in os.walk("parsed"):
             small_icon = item_dict.get("PreviewIcon", "None")
             large_icon = item_dict.get("LargePreviewIcon", "None")
             
+            asset = item_dict.get("Asset", "None")
+            
             if found_type == "PlayerModule":
                 if small_icon == large_icon == "None":
                     large_icon = item_dict.get("Asset", "None")
@@ -232,7 +235,8 @@ for root, folders, files in os.walk("parsed"):
                 "colors": color_swatch,
                 "bundledItems": bundled_items,
                 "max": max_allowed,
-                "origin": file.split("_", 1)[-1].rsplit("_", 1)[0]
+                "origin": file.split("_", 1)[-1].rsplit("_", 1)[0],
+                "asset": asset,
             }
             
             if found_type == "Gear":
@@ -247,6 +251,12 @@ for root, folders, files in os.walk("parsed"):
                     raise ValueError(f"Couldn't parse skin {item_id}")
                 owner_char, skin_id, skin_pattern = found.groups()
                 categorized_dict.setdefault(skin_id, {})[item_id] = object
+            elif found_type == "Taunt":
+                found = taunt_re.match(item_id)
+                if not found:
+                    raise ValueError(f"Couldn't parse Taunt {item_id}")
+                owner_char, taunt_type, taunt_id = found.groups()
+                categorized_dict.setdefault(taunt_type.title(), {})[item_id] = object
             else:
                 categorized_dict[item_id] = object
                 
