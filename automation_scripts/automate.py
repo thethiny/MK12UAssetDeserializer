@@ -23,7 +23,7 @@ for file in files:
     if not file.endswith(".uasset"):
         continue
     
-    print(f"{i}/{len(files)}")
+    print(f"{i}/{len(files)}", file)
     
     temp_file = os.path.join("temp", file)
     
@@ -36,14 +36,17 @@ for file in files:
     raw_extracted_path = os.path.join(extract_path, "Raw", "Extracted")
     name_table_path = os.path.join(extract_path, "Parsed", "NameTable.txt")
     
-    for inventory_item in os.listdir(raw_extracted_path):
-        copied_file = shutil.copy2(os.path.join(raw_extracted_path, inventory_item), TEMP_DIR)
-        name_file = shutil.copy2(name_table_path, f"{TEMP_DIR}/{inventory_item}.txt")
-        subprocess.run(["python", "-m", "main", copied_file], stdout=subprocess.DEVNULL)
-        # os.remove(copied_file)
-        # os.remove(name_file)
+    try:
+        for inventory_item in os.listdir(raw_extracted_path):
+            copied_file = shutil.copy2(os.path.join(raw_extracted_path, inventory_item), TEMP_DIR)
+            name_file = shutil.copy2(name_table_path, f"{TEMP_DIR}/{inventory_item}.txt")
+            subprocess.run(["python", "-m", "main", copied_file], stdout=subprocess.DEVNULL)
+            # os.remove(copied_file)
+            # os.remove(name_file)
+    except FileNotFoundError:
+        continue
 
-    shutil.rmtree(extract_path)
+    # shutil.rmtree(extract_path)
     # os.remove(temp_file)
 
 # os.removedirs(TEMP_DIR)
