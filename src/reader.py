@@ -184,6 +184,21 @@ class UAssetSerializer:
  
     def read_text_property(self):
         size = self.read_int(8)
+        unk = self.read_int(2)
+        unk2 = self.read_int(4)
+        
+        if unk2 == 0xFF000000:
+            unk3 = self.read_int(4)
+            return []
+        
+        strings = []
+        for _ in range(3):
+            string = self.read_string() # For debugging purposes, storing the value first
+            strings.append(string)
+        return strings
+
+    def read_text_property_old(self):
+        size = self.read_int(8)
         _ = self.file_handle.read(1)
         unk = self.read_int(4)
         flags = self.read_int(4)

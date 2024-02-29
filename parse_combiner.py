@@ -121,7 +121,7 @@ for root, folders, files in os.walk("parsed"):
                 raise Exception(f"Couldn't determine data type!")
             
         for item_id, item_dict in data.items():
-            translation_id, translation_default = item_dict.get("Title") or [None, None]
+            translation_source, translation_id, translation_default = item_dict.get("Title") or [None, None, None]
             requirement_trans_id, requirement_trans_default = item_dict.get("UnlockRequirement") or [None, None]
             rarity = item_dict.get("Rarity", {}).get("value", "")
             rarity = rarity.rsplit("::", 1)[-1]
@@ -223,6 +223,7 @@ for root, folders, files in os.walk("parsed"):
                     #"itemId": item_id,
                 #},
                 "name": {
+                    "localizationSource": translation_source,
                     "localizationId": translation_id,
                     "default": translation_default
                 },
