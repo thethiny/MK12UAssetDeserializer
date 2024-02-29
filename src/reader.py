@@ -81,8 +81,13 @@ class UAssetSerializer:
         return struct.unpack(format_str, data)[0]
     
     def read_string(self, size = None):
-        string_size = size if size is not None else self.read_int(4)
-        string = self.file_handle.read(string_size).decode()
+        string_size = size if size is not None else self.read_int(4, signed=True)
+        if string_size < 0:
+            string_size *= -2
+            encoding = "utf-16"
+        else:
+            encoding = "utf-8"
+        string = self.file_handle.read(string_size).decode(encoding)
         ret_str = ''
         for s in string:
             if s == '\x00':
