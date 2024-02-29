@@ -2,8 +2,6 @@ from io import BufferedReader
 import struct
 from typing import List, Optional
 
-from numpy import array_split
-
 INT_PACK_DICT = {1: 'B', 2: 'H', 4: 'I', 8: 'Q'}
 FLOAT_PACK_DICT = {4: 'f', 8: 'd'}
 
