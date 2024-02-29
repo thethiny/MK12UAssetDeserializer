@@ -122,7 +122,7 @@ for root, folders, files in os.walk("parsed"):
             
         for item_id, item_dict in data.items():
             translation_source, translation_id, translation_default = item_dict.get("Title") or [None, None, None]
-            requirement_trans_id, requirement_trans_default = item_dict.get("UnlockRequirement") or [None, None]
+            requirement_trans_source, requirement_trans_id, requirement_trans_default = item_dict.get("UnlockRequirement") or [None, None, None]
             rarity = item_dict.get("Rarity", {}).get("value", "")
             rarity = rarity.rsplit("::", 1)[-1]
             rarity = parse_rarity(rarity)
@@ -228,6 +228,7 @@ for root, folders, files in os.walk("parsed"):
                     "default": translation_default
                 },
                 "unlockRequirements": {
+                    "localizationSource": requirement_trans_source,
                     "localizationId": requirement_trans_id,
                     "default": requirement_trans_default
                 },
