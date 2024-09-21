@@ -377,18 +377,18 @@ class UAssetSerializer:
         elif element_name == "mPreReqStruct":
             value = self.read_struct_inner_element()
             return value
-        elif element_name == "DataTable":
-            table_super = self.read_fname()
-            table_unk1 = self.read_int(4)
-            items_count = self.read_int(4)
-            table = {}
-            for _ in range(items_count):
-                row_key = self.read_fname()
-                row_name, row_value = self.read_property_once()
-                table[row_key] = {row_name:row_value}
-                table_unk_extra = self.read_fname()
+        # elif element_name == "DataTable": # Removed cuz messing with other DataTables # Need to parse by name as explained above
+        #     table_super = self.read_fname()
+        #     table_unk1 = self.read_int(4)
+        #     items_count = self.read_int(4)
+        #     table = {}
+        #     for _ in range(items_count):
+        #         row_key = self.read_fname()
+        #         row_name, row_value = self.read_property_once()
+        #         table[row_key] = {row_name:row_value}
+        #         table_unk_extra = self.read_fname()
 
-            return table
+        #     return table
 
         return object_reference_index
 
@@ -403,7 +403,8 @@ class UAssetSerializer:
                 super().__setitem__(key, value)
 
     def read_struct_property(self, loop_count=1):
-        struct_size = self.read_int(8)
+        struct_size = self.read_int(4)
+        struct_dup_id = self.read_int(4) # When the key is the same
         struct_type = self.read_fname()
 
         UNK_byte = self.file_handle.read(1)
@@ -411,7 +412,7 @@ class UAssetSerializer:
         UNK_Int2 = self.read_int(8)
 
         cur_tell = self.file_handle.tell()
-        print(f"{struct_size=} {struct_type=} {UNK_byte=} {UNK_Int1=} {UNK_Int2=}")
+        print(f"{struct_size=} {struct_type=} (#{struct_dup_id}) {UNK_byte=} {UNK_Int1=} {UNK_Int2=}")
 
         if struct_type not in self.SUPPORTED_STRUCTS:
             print(f"Warning: Struct Type {struct_type} is not officially supported. Undefined behavior _may_ occur.")
@@ -430,9 +431,9 @@ class UAssetSerializer:
 
     def read_struct_as_type(self, struct_type: str):
         if struct_type == "DateTime":
-            return self.read_datetime_element()
+            return self.read_datetime_struct_element()
         elif struct_type == "Color":
-            return self.read_color_element()
+            return self.read_color_struct_element()
         else:
             return self.read_struct_element()
 
@@ -455,13 +456,13 @@ class UAssetSerializer:
 
         return value
 
-    def read_datetime_element(self):
+    def read_datetime_struct_element(self):
         value = self.ChainDict()
         value["date"] = self.read_int(4)
         value["time"] = self.read_int(4)
         return value
 
-    def read_color_element(self):
+    def read_color_struct_element(self):
         color = self.read_int(4)
         alpha = color >> 24
         color = color & 0xFFFFFF
