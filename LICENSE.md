@@ -1,0 +1,2 @@
+You can use this and update it as long as you give proper credit.
+If you want to make money from this, the tool needs to free. Example: If you own a launcher and this tool is needed, make the launcher free or ask people to download the tool from here. I do not care if the items in the launcher are not free as long as the launcher is free.
