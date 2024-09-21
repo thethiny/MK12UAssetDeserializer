@@ -373,7 +373,7 @@ class UAssetSerializer:
             for _ in range(3): # TODO: The reason this is an array is cuz "None" should not be read. Or maybe it should and I have a different error
                 key, value = self.read_property_once()
                 v[key] = value
-            return
+            return v
         elif element_name == "mPreReqStruct":
             value = self.read_struct_inner_element()
             return value
