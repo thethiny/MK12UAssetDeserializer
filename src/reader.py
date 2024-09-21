@@ -485,6 +485,19 @@ class UAssetSerializer:
             # element_reference_id = self.read_int(4, signed=True) # Because this is object property so I should map it correctly # TODO: ObjectType neg unk is object reference index or something
 
         return map_elements
+    
+    def read_fieldpath_property(self, from_array = False):
+        if not from_array:
+            size = self.read_int(8)
+            _ = self.read_int(1)
+    
+        paths = []
+        paths_count = self.read_int(4)
+        for path in range(paths_count):
+            path_index = self.read_int(8) #?
+            path_reference = self.read_obj_reference() #?
+            paths.append(f"Path {path_index} to {path_reference}")
+        return paths
 
     def read_data_as_type(self, value_type: str, element_name = "", loop_count = 1, from_array=False): # Element_name is only here for some specific cases, since I couldnt figure it out
         if value_type == "TextProperty":
@@ -512,6 +525,8 @@ class UAssetSerializer:
             value = self.read_string_property(from_array)
         elif value_type == "MapProperty":
             value = self.read_map_property(from_array)
+        elif value_type == "FieldPathProperty":
+            value = self.read_fieldpath_property(from_array)
         elif value_type == "None":
             print(f"Warning! Should not be possible. Possible corrupt file detected!")
             return None
