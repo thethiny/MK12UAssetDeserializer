@@ -1,4 +1,5 @@
-Converts extracted objects from UAssets into JSON. Currently only supports InventoryDataTables and there's no plan to make it support anything else.
-The root object type is determined by the file extension so each file needs its own Deserializer, however, looking at the game's code we can find that most of the game's UAssets are simply UScripts, so they share 90% of their serialization process. But since they deal with different structs and objects, everything needs to be reversed manually, therefore I see no reason for me to deserialize things that don't matter to me.
+Extracts UAssets then converts (parses) them into JSON. Built specifically for InventoryDataTables but extended for more types with time. Supporting all types is not planned and only files that I need will be parsed. You're free to fork this and add more types as you see fit, you'll mostly have to add the data to read_object_property and read_struct_property as the rest should never change, unless to add more atomic data types and `from_array`.
 
-Use [MK12PMan](https://github.com/thethiny/MK12PMan) to extract UAsset into objects.
+The root object type is determined by the file extension so each file needs its own Deserializer. Currently the extractor only works with `_b` files as many assumptions are present. Looking at the game's code we can find that most of the game's UAssets are simply UScripts, so they share 90% of their serialization process. But since they deal with different structs and objects, everything needs to be reversed manually, therefore I see no reason for me to deserialize things that don't matter to me.
+
+The old version used [MK12PMan](https://github.com/thethiny/MK12PMan) to extract UAsset into objects. But now this functionality [exists here](/src/uasset).

@@ -360,7 +360,14 @@ class UAssetSerializer:
             k, v = self.read_property_once() # Maybe wrong? Should be class I believe
             return {k:v}
         elif element_name == "ScriptStruct":
-            script_source = self.read_fname() # Either 8 bytes or 2 4 bytes, idc, it's working like this
+            # TODO: This method is wrong. It's not the element_name that decides since this points to an Object with a known definition.
+            # An example here is Object of type `MKFormulaDataPtr` is of name ScriptStruct but in the SDK is a subclass of `UFormulaData`
+            # Therefore MKFormulaDataPtr becomes UFormulaData, but it is a subclass so it's impossible to find it by name, instead we have to
+            # Search manually. So instead of supporting the `element_name` we should support the class manually since it can't be automated
+            # If there's another ScriptStruct of a different type it'll not work. The reason FModel can't view this field is because it doesn't
+            # know the datatype inside and can't guess the objects so it just displays empty.
+            # However, ScriptStruct is useful to know since it enforces the layout: fname, ref, data.
+            script_source = self.read_fname()
             script_reference = self.read_obj_reference()
             v = {}
             for _ in range(3): # TODO: The reason this is an array is cuz "None" should not be read. Or maybe it should and I have a different error
@@ -380,12 +387,8 @@ class UAssetSerializer:
                 row_name, row_value = self.read_property_once()
                 table[row_key] = {row_name:row_value}
                 table_unk_extra = self.read_fname()
-            
+
             return table
-                
-                
-            
-            
 
         return object_reference_index
 
