@@ -1,12 +1,10 @@
 __pycache__
-automate/
-automate_all*
+automate_*/
 .vscode
 *.json
 
 
-parsed
-temp
+processed
 testing
 test_data
 automate.bat
