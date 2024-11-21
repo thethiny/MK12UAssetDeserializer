@@ -1,6 +1,7 @@
 from io import BufferedReader, BytesIO
+import re
 import struct
-from typing import List, Optional, Union
+from typing import Any, List, Optional, Union
 
 INT_PACK_DICT = {1: 'B', 2: 'H', 4: 'I', 8: 'Q'}
 FLOAT_PACK_DICT = {4: 'f', 8: 'd'}
@@ -32,6 +33,8 @@ class UAssetSerializer:
     }
 
     _SUPPORTED_READ_MODES = Union[BufferedReader, bytes]
+
+    INT_PROPERTY_RE = re.compile(r"(U)?Int(\d*)Property")
 
     class ShallowReadIO:
         def __init__(self, data: bytes):
@@ -99,6 +102,9 @@ class UAssetSerializer:
     def __bool__(self):
         return self.file_handle.tell() == self.file_size
 
+    def tell(self):
+        return hex(self.file_handle.tell())
+
     @property
     def _tell(self):
         return self.file_handle.tell()
@@ -106,22 +112,27 @@ class UAssetSerializer:
     def deserialize(self,):
         return self.read_property_once()
 
+    def number_to_fname(self, number, suffix = 0):
+        name = self.nametable[number]
+        if suffix:
+            # Noticed that all items start at 2 instead of 0, so BG_Ashrah.2 is actually BG_Ashrah_1
+            name += f"_{suffix-1}"  # Enable if you want
+            # name += f".{suffix}" # Enable if you want
+        return name
+
     # Reads
     def read_fname(self):
         name = self.read_int(4, endianness="le", signed=False)
         name_suffix = self.read_int(4, endianness="le", signed=False)
-        name = self.nametable[name]
-        if name_suffix:
-            # Noticed that all items start at 2 instead of 0, so BG_Ashrah.2 is actually BG_Ashrah_1
-            name += f"_{name_suffix-1}" # Enable if you want
-            # name += f".{name_suffix}" # Enable if you want
+        name = self.number_to_fname(name, name_suffix)
         return name
 
     def read_obj_reference(self):
         ref_idx = self.read_int(4, endianness="le", signed=True)
         ref_name = abs(ref_idx)+1
         try:
-            return f"Object {'-' if ref_idx < 0 else ''}0x{abs(ref_idx):X}: {self.nametable[ref_name]}"
+            name = self.nametable[ref_name]
+            return f"Object {'-' if ref_idx < 0 else ''}0x{abs(ref_idx):X}: {name}"
         except IndexError:
             return f"[ref:={ref_idx:X}|{ref_name:X}]"
 
@@ -159,32 +170,55 @@ class UAssetSerializer:
             ret_str += s
         return ret_str
 
-    def read_property_once(self):
+    def read_property_once(self, loop_count = 1):
         property_name = self.read_fname()
         if property_name == "None":
             property_reference = self.read_int(4)
             if property_reference != 0:
-                raise ValueError(f"Encountered Unknown Property `None` with no size {property_reference} not 0!")
+                print (f"Warning: Encountered Unknown Property `None` with size {property_reference} not 0! Undefined Behavior! Expect Crashes!")
+                self.file_handle.seek(-4 -8, 1)
                 # This is very new! I have no idea what this breaks!
             return "", None # Sometimes ObjectProperty has None (0x8), SomeClass (0x4) after it and idk why or when
         property_type = self.read_fname()
-        print(f"{property_name=} | {property_type}")
-        property_value = self.read_data_as_type(property_type, property_name)
+        # print(f"{property_name=} | {property_type}")
+        property_value = self.read_data_as_type(property_type, property_name, loop_count)
         return property_name, property_value
 
     # Properties
     def read_bool_property(self, from_array = False):
         if from_array:
             return self.read_int(1) == 1
-        _ = self.read_int(8)
+        size = self.read_int(8)
         value = self.read_int(1)
         _ = self.file_handle.read(1)
         return value == 1
 
-    def read_int_property(self, signed=True, from_array = False):
-        size = self.read_int(8)
+    def read_byte_property(self, from_array = False):
+        if from_array:
+            byte_type = self.read_fname()
+            if byte_type == "None":
+                return self.read_int(1)
+            return self.read_fname()
+        size = self.read_int(8) # idk if this is size or object counts since a byte is one bye lol
+        byte_type = self.read_fname()
         _ = self.file_handle.read(1)
-        value = self.read_int(size, signed=signed)
+        # value = self.read_int(size) # Either once of size `size` or size entries of fname of size 1 each, or completely different. Idk for now. Maybe if it's NONE then you read 1 byte, but if it's not None then you read 8 bytes and that is subtype.
+        # return value
+        if byte_type == "None":
+            return self.read_int(size)
+        if size !=8:
+            raise NotImplementedError(f"When byte type is not None, fname is assumed, but fname was not received!")
+        return self.read_fname()
+
+    def read_int_property(self, signed=True, infered_sized = 8, from_array = False,):
+        if from_array:
+            value = self.read_int(infered_sized, signed=signed)
+            return value
+        size = self.read_int(8)
+        if size != infered_sized:
+            print(f"Warning: Int Size was {size} but name indicated a size of {infered_sized}")
+        _ = self.file_handle.read(1)
+        value = self.read_int(size, signed=signed) # When unsigned most of the time it's a bitmap
         return value
 
     def read_float_property(self):
@@ -252,10 +286,10 @@ class UAssetSerializer:
         cur_tell = self.file_handle.tell()
         elements_count = self.read_int(4)
         values = []
-        if array_type == "StructProperty": # TODO: Experimental Feature
-            array_struct_name = self.read_fname()
-            array_type = self.read_fname() # Should be the same as the caller, unsure if inside loop or outside
-            values = self.read_data_as_type(array_type, loop_count=elements_count)
+        if array_type == "StructProperty": # TODO: Needs testing - Update: Testing seems fine
+            #     array_struct_name = self.read_fname() # Assert same name as previous fname
+            #     array_type = self.read_fname() # Should be the same as the caller, unsure if inside loop or outside
+            values = self.read_data_as_type(array_type, loop_count=elements_count, from_array=True)
         else:
             for _ in range(elements_count):
                 # Read data
@@ -263,7 +297,10 @@ class UAssetSerializer:
                 values.append(value)
         tell_diff = self._tell - cur_tell
         if tell_diff != array_size:
-            print(f"Warning: Array Size did not match Expected Size! Possible wrong handling of {array_type}.\nExpected: {array_size}. Got: {tell_diff}")
+            raise ValueError(f"Error: Array Size did not match Expected Size! Possible wrong handling of {array_type}.\nExpected: {array_size}. Got: {tell_diff}")
+        # n = self.read_fname()
+        # if n != "None":
+            # self.file_handle.seek(-8, 1)
         return values
 
     def read_string_property(self, from_array = False):
@@ -300,27 +337,6 @@ class UAssetSerializer:
             strings.append(string)
         return strings
 
-    def read_text_property_old(self):
-        size = self.read_int(8)
-        _ = self.file_handle.read(1)
-        unk = self.read_int(4)
-        flags = self.read_int(4)
-        if flags == 255: # I believe 255 is -1
-            strings_count = 0
-            _ = self.file_handle.read(1)
-        elif flags == 256:
-            strings_count = 2
-            _ = self.file_handle.read(2)
-        else:
-            raise NotImplementedError(f"Unknown Text Property {flags}")
-        # flag_log = int(math.log(flags, 256)) + 1 # They're 8 byte flags + unk amt of padding
-        # _ = f.read(flag_log) # Padding or something idk
-        strings = []
-        for _ in range(strings_count):
-            string = self.read_string()
-            strings.append(string)
-        return strings
-
     def read_soft_object_property(self, from_array = False):
         if not from_array:
             size = self.read_int(8)
@@ -335,11 +351,11 @@ class UAssetSerializer:
             return self.read_obj_reference()
 
         object_size = self.read_int(8)
-        _ = self.file_handle.read(1) # TODO: Maybe items count... idk? NO! This exists in obj prop and soft obj prop so probably flag
+        _ = self.file_handle.read(1) # TODO: Maybe items count... idk? NO! This exists in obj prop and soft obj prop so probably flag # Padding
 
         object_reference_index = self.read_obj_reference()
 
-        print(f"{element_name}: ObjectProperty {object_reference_index}")
+        # print(f"{element_name}: ObjectProperty {object_reference_index}")
 
         if element_name == "RowStruct": # Custom elements
             object_super = self.read_fname()
@@ -377,18 +393,18 @@ class UAssetSerializer:
         elif element_name == "mPreReqStruct":
             value = self.read_struct_inner_element()
             return value
-        # elif element_name == "DataTable": # Removed cuz messing with other DataTables # Need to parse by name as explained above
-        #     table_super = self.read_fname()
-        #     table_unk1 = self.read_int(4)
-        #     items_count = self.read_int(4)
-        #     table = {}
-        #     for _ in range(items_count):
-        #         row_key = self.read_fname()
-        #         row_name, row_value = self.read_property_once()
-        #         table[row_key] = {row_name:row_value}
-        #         table_unk_extra = self.read_fname()
+        elif element_name == "DataTable" and False: # Removed cuz messing with other DataTables # Need to parse by name as explained above
+            table_super = self.read_fname()
+            table_unk1 = self.read_int(4)
+            items_count = self.read_int(4)
+            table = {}
+            for _ in range(items_count):
+                row_key = self.read_fname()
+                row_name, row_value = self.read_property_once()
+                table[row_key] = {row_name:row_value}
+                table_unk_extra = self.read_fname()
 
-        #     return table
+            return table
 
         return object_reference_index
 
@@ -402,7 +418,15 @@ class UAssetSerializer:
             else:
                 super().__setitem__(key, value)
 
-    def read_struct_property(self, loop_count=1):
+    def read_struct_property(self, loop_count=1, from_array = False):
+        if from_array: # TODO: NEW UNTESTED - Update: Breaks too many things, seems like struct has no from_array
+            name, value = self.read_property_once(loop_count)
+            # array_struct_name = self.read_fname() # Assert same name as previous fname
+            # array_type = self.read_fname() # Should be the same as the caller, unsure if inside loop or outside
+            # value = self.read_data_as_type(array_type, array_struct_name, loop_count)
+            
+            return value
+
         struct_size = self.read_int(4)
         struct_dup_id = self.read_int(4) # When the key is the same
         struct_type = self.read_fname()
@@ -434,6 +458,8 @@ class UAssetSerializer:
             return self.read_datetime_struct_element()
         elif struct_type == "Color":
             return self.read_color_struct_element()
+        elif struct_type == "Timespan":
+            return self.read_int(8, signed=False)
         else:
             return self.read_struct_element()
 
@@ -470,47 +496,59 @@ class UAssetSerializer:
         return value
 
     def read_map_property(self, from_array = False):
-        key = self.read_fname()
-        key_type = self.read_fname() # TODO: Check what to do with this cuz I have to use it somehow, but since it's json I don't think I need to store it, but would be useful to store as meta or something in the map_ below
+        # key = self.read_fname() # Key is not always fname
+        map_size = self.read_int(8)
+        key_type = self.read_fname()
         value_type = self.read_fname()
-        unk = self.read_int(4)
         _ = self.read_int(1)
-        elements_count = self.read_int(4)
-        map_ = {}
-        map_elements = map_[key] = {}
-        for element in range(elements_count):
-            element_name = self.read_fname()
-            element_value = self.read_data_as_type(value_type, element_name, element, True)
-            map_elements[element_name] = element_value
-            # element_reference_id = self.read_int(4, signed=True) # Because this is object property so I should map it correctly # TODO: ObjectType neg unk is object reference index or something
 
+        cur_tell = self.file_handle.tell()
+        unk = self.read_int(4)
+        elements_count = self.read_int(4)
+        map_elements = {}
+        for idx in range(elements_count):
+            # map_key = self.read_fname()
+            map_key = self.read_data_as_type(key_type, from_array=True)
+            map_value = self.read_data_as_type(value_type, map_key, from_array=True) # TODO: Is `idx` needed here?
+            map_elements[map_key] = map_value
+            # element_reference_id = self.read_int(4, signed=True) # Because this is object property so I should map it correctly # TODO: ObjectType neg unk is object reference index or something
+        tell_diff = self.file_handle.tell() - cur_tell
+        if tell_diff != map_size:
+            raise ValueError(f"Error: Expected map of size {map_size} but got size {tell_diff}")
         return map_elements
-    
+
     def read_fieldpath_property(self, from_array = False):
         if not from_array:
             size = self.read_int(8)
             _ = self.read_int(1)
-    
+
         paths = []
         paths_count = self.read_int(4)
         for path in range(paths_count):
-            path_index = self.read_int(8) #?
-            path_reference = self.read_obj_reference() #?
-            paths.append(f"Path {path_index} to {path_reference}")
+            path_name = self.read_fname()
+            paths.append(path_name)
+        path_owner_reference = self.read_obj_reference()
+        print(f"FPath with owner {path_owner_reference} had {paths_count} entries!")
         return paths
 
-    def read_data_as_type(self, value_type: str, element_name = "", loop_count = 1, from_array=False): # Element_name is only here for some specific cases, since I couldnt figure it out
+    def read_data_as_type(self, value_type: str, element_name: Any = "", loop_count = 1, from_array=False): # Element_name is only here for some specific cases, since I couldnt figure it out
+        int_match = self.INT_PROPERTY_RE.match(value_type)
         if value_type == "TextProperty":
             value = self.read_text_property()
         elif value_type == "EnumProperty":
             value = self.read_enum_property(from_array)
         elif value_type == "StructProperty":
-            value = self.read_struct_property(loop_count)
+            value = self.read_struct_property(loop_count, from_array)
         elif value_type == "BoolProperty":
             value = self.read_bool_property(from_array)
-        elif "Int" in value_type and value_type.endswith("Property"):
-            signed = value_type[0] != "U"
-            value = self.read_int_property(signed=signed)
+        elif value_type == "ByteProperty":
+            value = self.read_byte_property(from_array)
+        # elif "Int" in value_type and value_type.endswith("Property"):
+        elif int_match:
+            signed, size_ = int_match.groups()
+            signed = signed != "U"
+            size_ = int(size_ or 32) // 8
+            value = self.read_int_property(signed=signed, infered_sized=size_, from_array=from_array)
         elif value_type == "FloatProperty":
             value = self.read_float_property()
         elif value_type == "ArrayProperty":
