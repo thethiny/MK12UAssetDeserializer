@@ -12,6 +12,7 @@ taunt_re = re.compile(r"([A-Za-z]+)_([A-Za-z]+)(\d+)")
 ALLOWED_CATEGORIES = set([
     "Fatality",
     "Brutality",
+    # "DeepDish", # Animality - If commented it's counted as Fatality
     "Announcer",
     "Skin",
     "Gear",
@@ -23,7 +24,7 @@ ALLOWED_CATEGORIES = set([
     "PlayerModule",
     "Taunt",
     "Music",
-    "Progression"
+    "Progression",
 ])
 
 CHARACTERS = set([
@@ -48,6 +49,7 @@ CHARACTERS = set([
     "ShangTsung",
     "ShaoKahn",
     "GeneralShao",
+    "GShao",
     "Sindel",
     "Smoke",
     "SubZero",
@@ -62,7 +64,7 @@ CHARACTERS = set([
     # Story DLC
     "Cyrax",
     "Sektor",
-    "Noob",
+    "NoobSaibot",
     # Guest DLC
     "Ghostface",
     "T1000",
@@ -97,6 +99,9 @@ KAMEOS = set([a + "KAM" for a in [
     "JanetCage",
     "Mavado",
     "Ferra"
+    # Leaked DLC
+    "Onyx",
+    "KungJin"
 ]])
 
 RARITIES = {
@@ -222,10 +227,12 @@ def combine(in_folder, global_data):
 
                 color_swatch = item_dict.get("ColorPaletteSwatch", {}).get("Colors")
 
-                itemSlug = item_id
-                if len(itemSlug.rsplit(".", 1)) > 1: # Deprecated
-                    slug, _id = itemSlug.rsplit(".", 1)
-                    itemSlug = f"{slug}_{int(_id)-1}"
+                # itemSlug = item_id
+                # if len(itemSlug.rsplit(".", 1)) > 1: # Deprecated
+                #     print(itemSlug)
+                #     slug, _id = itemSlug.rsplit(".", 1)
+                #     itemSlug = f"{slug}_{int(_id)-1}"
+                #     # Some Items end with 0.1 to indicate a float so this doesn't work
 
                 object = {
                     "id": item_id, #{
@@ -265,9 +272,13 @@ def combine(in_folder, global_data):
                     categorized_dict.setdefault(skin_id, {})[item_id] = object
                 elif found_type == "Taunt":
                     found = taunt_re.match(item_id)
-                    if not found:
-                        raise ValueError(f"Couldn't parse Taunt {item_id}")
-                    owner_char, taunt_type, taunt_id = found.groups()
+                    if found:
+                        owner_char, taunt_type, taunt_id = found.groups()
+                    else:
+                        if "Passive-Bonus" in tags:
+                            taunt_type = "Passive"
+                        else:
+                            raise ValueError(f"Couldn't parse Taunt {item_id}")
                     categorized_dict.setdefault(taunt_type.title(), {})[item_id] = object
                 else:
                     categorized_dict[item_id] = object
@@ -285,4 +296,3 @@ def postprocess_dict(dictionary):
         return d
     else:
         return dictionary
-
