@@ -25,6 +25,7 @@ ALLOWED_CATEGORIES = set([
     "Taunt",
     "Music",
     "Progression",
+    "MapMode-Movie",
 ])
 
 CHARACTERS = set([
@@ -98,10 +99,12 @@ KAMEOS = set([a + "KAM" for a in [
     "JohnnyCage",
     "JanetCage",
     "Mavado",
-    "Ferra"
-    # Leaked DLC
+    "Ferra",
+    # Extra
+    "Floyd",
     "Onyx",
-    "KungJin"
+    # Leaked DLC
+    "KungJin",
 ]])
 
 RARITIES = {
@@ -147,7 +150,7 @@ def combine(in_folder, global_data):
                 bundled_items = item_dict.get("BundledItems", [])
                 bundled_items = [item["RowName"] for item in bundled_items]
 
-                categorized_dict = global_data["Other"] # Fallback
+                categorized_dict = global_data["OtherCategories"] # Fallback
                 tags = set(item_dict.get("Tags", []))
                 tags |= set(item_dict.get("InternalTags", []))
                 character = item_dict.get("Character", {}).get("RowName")
@@ -186,7 +189,7 @@ def combine(in_folder, global_data):
                         type_dict = global_data.setdefault(category, {})
                         if not character:
                             print(f"Warning! Character Subtag {category} with no Character!")
-                            character = "Other"
+                            character = "OtherCharacter"
                             # exit()
                         categorized_dict = type_dict.setdefault(character, {})
                         found_type = category

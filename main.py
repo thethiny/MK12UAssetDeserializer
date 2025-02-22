@@ -59,7 +59,7 @@ if __name__ == "__main__":
         if extract_only:
             exit(0)
 
-    global_data = combine(parsed_save_folder, {"Other": {}})
+    global_data = combine(parsed_save_folder, {"OtherCategories": {}})
     global_data = postprocess_dict(global_data)
 
     out_folder = "combined_data"
