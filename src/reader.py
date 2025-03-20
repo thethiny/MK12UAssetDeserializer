@@ -12,7 +12,7 @@ class UAssetSerializer:
         "RowStruct",
         "mLootStruct"
     }
-    SUPPORTED_STRUCTS = { # No longer needed as everything is now automated
+    SUPPORTED_STRUCTS = {  # No longer needed as everything is now automated
         "ColorPaletteSwatch",  # 4
         "MKInventoryItemPrice",  # 3
         "MKInventoryDataTableRowHandle",  # 2
@@ -25,6 +25,7 @@ class UAssetSerializer:
         "CharacterLibraryAssetEntry",  # 6
         "DateTime",
         "Color",
+        "Timespan",
     }
 
     SUPPORTED_ENUMS = {
@@ -298,9 +299,6 @@ class UAssetSerializer:
         tell_diff = self._tell - cur_tell
         if tell_diff != array_size:
             raise ValueError(f"Error: Array Size did not match Expected Size! Possible wrong handling of {array_type}.\nExpected: {array_size}. Got: {tell_diff}")
-        # n = self.read_fname()
-        # if n != "None":
-            # self.file_handle.seek(-8, 1)
         return values
 
     def read_string_property(self, from_array = False):
@@ -310,10 +308,6 @@ class UAssetSerializer:
         size = self.read_int(4)
         string = self.read_string(size)
         return string
-        # array_size = self.read_int(8)
-        # string = self.read_string(array_size)
-        # _ = self.read_int(1)
-        # return string
 
     def read_name_property(self, from_array = False):
         if from_array:
@@ -386,7 +380,12 @@ class UAssetSerializer:
             script_source = self.read_fname()
             script_reference = self.read_obj_reference()
             v = {}
-            for _ in range(3): # TODO: The reason this is an array is cuz "None" should not be read. Or maybe it should and I have a different error
+            # range_ = 0 if script_source == "None" else 3 # Change?
+            range_ = 3
+            for _ in range(range_): # TODO: The reason this is an array is cuz "None" should not be read. Or maybe it should and I have a different error
+                # After testing MKFormulaDataPtr with another item (Relics.uasset) I found that size was not 3 and it was 0 actually. Perhaps have to keep reading
+                # until size is fulfilled or until None is encountered, which is not possible in my scenario since there was no None.
+                # What I believe now is `script_source` is the one to indicate the actual data
                 key, value = self.read_property_once()
                 v[key] = value
             return v
@@ -424,7 +423,7 @@ class UAssetSerializer:
             # array_struct_name = self.read_fname() # Assert same name as previous fname
             # array_type = self.read_fname() # Should be the same as the caller, unsure if inside loop or outside
             # value = self.read_data_as_type(array_type, array_struct_name, loop_count)
-            
+
             return value
 
         struct_size = self.read_int(4)
@@ -458,6 +457,13 @@ class UAssetSerializer:
             return self.read_datetime_struct_element()
         elif struct_type == "Color":
             return self.read_color_struct_element()
+        elif struct_type == "LinearColor":
+            colors = []
+            for _ in range(4):
+                color = self.read_float(4)
+                colors.append(color)
+            # full_color = f"({', '.join(str(c) for c in colors)})"
+            return colors
         elif struct_type == "Timespan":
             return self.read_int(8, signed=False)
         else:
@@ -470,7 +476,7 @@ class UAssetSerializer:
         value = self.ChainDict() # Maybe not chain
 
         is_struct_over = self.read_fname()
-        while is_struct_over != "None":
+        while is_struct_over != "None": # For Script Struct the struct was over but there was no None
             self.file_handle.seek(-8, 1) # Undo read
             if has_super:
                 script_source = self.read_fname()
@@ -492,7 +498,7 @@ class UAssetSerializer:
         color = self.read_int(4)
         alpha = color >> 24
         color = color & 0xFFFFFF
-        value = f"#{color:0>2x}{alpha:0>2x}"
+        value = f"#{color:0>6x}{alpha:0>2x}"
         return value
 
     def read_map_property(self, from_array = False):
@@ -511,7 +517,13 @@ class UAssetSerializer:
             map_key = self.read_data_as_type(key_type, from_array=True)
             map_value = self.read_data_as_type(value_type, map_key, from_array=True) # TODO: Is `idx` needed here?
             map_elements[map_key] = map_value
-            # element_reference_id = self.read_int(4, signed=True) # Because this is object property so I should map it correctly # TODO: ObjectType neg unk is object reference index or something
+            try:
+                n = self.read_fname()
+                if n != "None":
+                    self.file_handle.seek(-8, 1)
+            except Exception:
+                continue
+        # element_reference_id = self.read_int(4, signed=True) # Because this is object property so I should map it correctly # TODO: ObjectType neg unk is object reference index or something
         tell_diff = self.file_handle.tell() - cur_tell
         if tell_diff != map_size:
             raise ValueError(f"Error: Expected map of size {map_size} but got size {tell_diff}")

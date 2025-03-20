@@ -5,9 +5,9 @@ from sys import argv
 
 character_stuff_re = re.compile(r"(?:Character|Kameo)-?(.+\b)")
 gear_parse_re = re.compile(r"(.+)_Gear(\d+)(?:_(.+))?")
-player_module_re = re.compile(r"(F|B)G_([A-Za-z]+)(_.+)+")
-character_skin_re = re.compile(r"([A-Za-z]+)_Skin(\d+)(.*)")
-taunt_re = re.compile(r"([A-Za-z]+)_([A-Za-z]+)(\d+)")
+player_module_re = re.compile(r"(F|B)G_([A-Za-z]+|T1000)(_.+)+")
+character_skin_re = re.compile(r"([A-Za-z]+|T1000)_Skin(\d+)(.*)")
+taunt_re = re.compile(r"([A-Za-z]+|T1000)_([A-Za-z]+)(\d+)")
 
 ALLOWED_CATEGORIES = set([
     "Fatality",
@@ -141,6 +141,7 @@ def combine(in_folder, global_data):
             for item_id, item_dict in data.items():
                 translation_source, translation_id, translation_default = item_dict.get("Title") or [None, None, None]
                 requirement_trans_source, requirement_trans_id, requirement_trans_default = item_dict.get("UnlockRequirement") or [None, None, None]
+                alt_requirements = item_dict.get("ReferencerContexts", [])
                 rarity = item_dict.get("Rarity", {}).get("value", "")
                 rarity = rarity.rsplit("::", 1)[-1]
                 rarity = parse_rarity(rarity)
@@ -250,7 +251,8 @@ def combine(in_folder, global_data):
                     "unlockRequirements": {
                         "localizationSource": requirement_trans_source,
                         "localizationId": requirement_trans_id,
-                        "default": requirement_trans_default
+                        "default": requirement_trans_default,
+                        "altUnlockRequirements": alt_requirements,
                     },
                     "rarity": rarity,
                     "previewImages": icons,
